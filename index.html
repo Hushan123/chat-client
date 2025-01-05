@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>hushan的即时通讯</title>
+  <!-- 引入 Bootstrap 和 Google Fonts -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: linear-gradient(to right, #ece9e6, #ffffff);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      max-width: 500px;
+      width: 100%;
+    }
+    .form-control, .btn {
+      border-radius: 30px;
+    }
+    #messages {
+      height: 300px;
+      overflow-y: auto;
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+    .message {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 15px;
+      max-width: 80%;
+    }
+    .message.user {
+      background-color: #d1e7dd;
+      text-align: right;
+      margin-left: auto;
+    }
+    .message.other {
+      background-color: #e2e3e5;
+      text-align: left;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 class="text-center mb-4">hushan的即时通讯</h2>
+
+    <!-- 注册部分 -->
+    <div>
+      <h5>注册</h5>
+      <div class="mb-3">
+        <input id="registerUsername" type="text" class="form-control" placeholder="用户名">
+      </div>
+      <div class="mb-3">
+        <input id="registerPassword" type="password" class="form-control" placeholder="密码">
+      </div>
+      <button onclick="register()" class="btn btn-primary w-100">注册</button>
+    </div>
+
+    <hr>
+
+    <!-- 登录部分 -->
+    <div>
+      <h5>登录</h5>
+      <div class="mb-3">
+        <input id="username" type="text" class="form-control" placeholder="用户名">
+      </div>
+      <div class="mb-3">
+        <input id="password" type="password" class="form-control" placeholder="密码">
+      </div>
+      <button onclick="login()" class="btn btn-success w-100">登录</button>
+    </div>
+
+    <div class="mt-3 text-center">
+      <button onclick="logout()" class="btn btn-outline-danger w-100">注销</button>
+    </div>
+
+    <hr>
+
+    <!-- 修改密码部分 -->
+    <div>
+      <h5>修改密码</h5>
+      <div class="mb-3">
+        <input id="oldPassword" type="password" class="form-control" placeholder="旧密码">
+      </div>
+      <div class="mb-3">
+        <input id="newPassword" type="password" class="form-control" placeholder="新密码">
+      </div>
+      <button onclick="changePassword()" class="btn btn-warning w-100">修改密码</button>
+    </div>
+
+    <hr>
+
+    <!-- 消息部分 -->
+    <div>
+      <h5>消息</h5>
+      <div id="messages"></div>
+      <div class="mb-3">
+        <input id="targetUser" type="text" class="form-control" placeholder="目标用户">
+      </div>
+      <div class="input-group">
+        <input id="message" type="text" class="form-control" placeholder="输入消息">
+        <button onclick="sendMessage()" class="btn btn-primary">发送</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 脚本逻辑 -->
+  <script>
+    const ws = new WebSocket("ws://38.6.226.228:5000"); // 替换为你的服务端地址
+    let isAuthenticated = false;
+    let currentUser = "";
+
+    ws.onopen = () => {
+      console.log("WebSocket 已连接");
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      const messagesDiv = document.getElementById("messages");
+      const messageDiv = document.createElement("div");
+
+      if (data.error) {
+        alert(`错误: ${data.error}`);
+      } else if (data.success) {
+        alert(`成功: ${data.success}`);
+        if (data.success === "登录成功") {
+          isAuthenticated = true;
+          currentUser = data.username;
+        }
+      } else {
+        messageDiv.classList.add("message", data.from === currentUser ? "user" : "other");
+        messageDiv.textContent = `${data.from}: ${data.content}`;
+        messagesDiv.appendChild(messageDiv);
+
+        // 自动滚动到最新消息
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket 错误:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket 已关闭");
+    };
+
+    function checkWebSocketConnection() {
+      if (ws.readyState !== WebSocket.OPEN) {
+        alert("无法连接到服务器，请检查网络或服务器状态！");
+        console.error("WebSocket 未连接到服务器");
+        return false;
+      }
+      return true;
+    }
+
+    function register() {
+      if (!checkWebSocketConnection()) return;
+
+      const username = document.getElementById("registerUsername").value;
+      const password = document.getElementById("registerPassword").value;
+
+      ws.send(JSON.stringify({ type: "register", username, password }));
+      console.log("注册请求已发送:", { username });
+    }
+
+    function login() {
+      if (!checkWebSocketConnection()) return;
+
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      ws.send(JSON.stringify({ type: "login", username, password }));
+      console.log("登录请求已发送:", { username });
+    }
+
+    function logout() {
+      if (!checkWebSocketConnection()) return;
+
+      if (!isAuthenticated) {
+        alert("您尚未登录！");
+        return;
+      }
+
+      ws.send(JSON.stringify({ type: "logout", username: currentUser }));
+      console.log("注销请求已发送:", { username: currentUser });
+
+      isAuthenticated = false;
+      currentUser = "";
+      alert("您已注销");
+    }
+
+    function changePassword() {
+      if (!checkWebSocketConnection()) return;
+
+      if (!isAuthenticated) {
+        alert("请先登录！");
+        return;
+      }
+
+      const oldPassword = document.getElementById("oldPassword").value;
+      const newPassword = document.getElementById("newPassword").value;
+
+      ws.send(JSON.stringify({ type: "changePassword", username: currentUser, oldPassword, newPassword }));
+      console.log("修改密码请求已发送:", { username: currentUser });
+    }
+
+    function sendMessage() {
+      if (!checkWebSocketConnection()) return;
+
+      if (!isAuthenticated) {
+        alert("请先登录！");
+        return;
+      }
+
+      const targetUser = document.getElementById("targetUser").value;
+      const content = document.getElementById("message").value;
+
+      ws.send(JSON.stringify({ type: "message", username: currentUser, targetUser, content }));
+
+      // 显示自己的消息
+      const messagesDiv = document.getElementById("messages");
+      const messageDiv = document.createElement("div");
+      messageDiv.classList.add("message", "user");
+      messageDiv.textContent = `你: ${content}`;
+      messagesDiv.appendChild(messageDiv);
+
+      // 清空输入框
+      document.getElementById("message").value = "";
+
+      // 自动滚动到最新消息
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+  </script>
+</body>
+</html>
